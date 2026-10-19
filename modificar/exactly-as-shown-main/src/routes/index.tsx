@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { User, Phone, Cake, Dumbbell, Wallet, CalendarDays, Clock, Info, Eraser } from "lucide-react";
 
+import { normalizeName, validateNome } from "@/lib/validacao-nome";
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -66,7 +68,8 @@ const minDate = () => new Date(1900, 0, 1);
 
 function validate(f: Form) {
   const e: Partial<Record<keyof Form, string>> = {};
-  if (f.nome.trim().length < 3) e.nome = "Informe seu nome completo.";
+  const nomeError = validateNome(f.nome);
+  if (nomeError) e.nome = nomeError;
   const tel = f.tel.replace(/\D/g, "");
   if (tel.length < 10 || tel.length > 11) e.tel = "Informe um telefone válido com DDD.";
   if (!f.nasc) e.nasc = "Informe sua data de nascimento.";
@@ -87,6 +90,24 @@ function Index() {
     if (errors[k]) setErrors((p) => ({ ...p, [k]: undefined }));
   };
 
+  // Valida o nome enquanto a pessoa digita (se já houver erro) e ao sair do campo.
+  const setNomeError = (err: string | undefined) => {
+    setErrors((p) => {
+      const next: Partial<Record<keyof Form, string>> = { ...p };
+      if (err) next.nome = err;
+      else delete next.nome;
+      return next;
+    });
+  };
+  const onNomeChange = (v: string) => {
+    setF((p) => ({ ...p, nome: v }));
+    if (errors.nome) setNomeError(validateNome(v));
+  };
+  const onNomeBlur = () => {
+    if (!f.nome.trim()) return;
+    setNomeError(validateNome(f.nome));
+  };
+
   const submit = (ev: React.FormEvent) => {
     ev.preventDefault();
     const e = validate(f);
@@ -95,7 +116,7 @@ function Index() {
     const valor = moneyNum(f.valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     const msg = [
       "NOVO CADASTRO DE ALUNO — CENA FIT", "",
-      `Nome completo: ${f.nome.trim()}`,
+      `Nome completo: ${normalizeName(f.nome)}`,
       `Telefone/WhatsApp: ${f.tel}`,
       `Data de nascimento: ${f.nasc}`,
       `Plano de treino: ${f.dias} dias por semana`,
@@ -147,7 +168,7 @@ function Index() {
           <div className="grid gap-5 md:grid-cols-2">
             <Field label="Nome completo" icon={<User />} error={errors.nome} className="md:col-span-2">
               <input className="field" placeholder="Digite seu nome completo" value={f.nome} maxLength={100}
-                aria-invalid={!!errors.nome} onChange={(e) => set("nome", e.target.value)} autoComplete="name" />
+                aria-invalid={!!errors.nome} onChange={(e) => onNomeChange(e.target.value)} onBlur={onNomeBlur} autoComplete="name" />
             </Field>
             <Field label="Telefone / WhatsApp" icon={<Phone />} error={errors.tel}>
               <input className="field" type="tel" inputMode="numeric" placeholder="(00) 00000-0000" value={f.tel}
